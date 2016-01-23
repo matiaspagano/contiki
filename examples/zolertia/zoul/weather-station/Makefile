@@ -1,0 +1,12 @@
+all: udp-client
+
+TARGET = zoul
+
+CONTIKI = ../../../..
+
+CFLAGS += -DPROJECT_CONF_H=\"project-conf.h\"
+CONTIKI_TARGET_SOURCEFILES += sht25.c bmpx8x.c weather-meter.c
+PROJECT_SOURCEFILES += weather-sensors.c weather-station.c
+
+CONTIKI_WITH_IPV6 = 1
+include $(CONTIKI)/Makefile.include
