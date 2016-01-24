@@ -48,8 +48,12 @@
 #define PROJECT_CONF_H_
 /*---------------------------------------------------------------------------*/
 
-/* Disable duty cycle (for testing only) */
+/* Do not drop below LPM1 to avoid problems with the I2C (theory not tested) */
+#define LPM_CONF_MAX_PM       1
+
+/* Disable duty cycle (increases battery drain, for testing only) */
 #define NETSTACK_CONF_RDC     nullrdc_driver
+
 /*---------------------------------------------------------------------------*/
 /* Connection pin-out 
  * -------------+-----------------------------

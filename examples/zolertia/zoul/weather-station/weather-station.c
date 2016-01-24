@@ -49,20 +49,36 @@
 #include "dev/weather-meter.h"
 #include "weather-station.h"
 #include "dev/leds.h"
+#include "cfs/cfs.h"
+#include "cfs/cfs-coffee.h"
+
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
+#include <stdlib.h>
+
+#include "httpd-simple.h"
+/*---------------------------------------------------------------------------*/
+#define DEBUG 0
+#if DEBUG
+#define PRINTF(...) printf(__VA_ARGS__)
+#else
+#define PRINTF(...)
+#endif
 /*---------------------------------------------------------------------------*/
 weather_station_t weather_sensor_values;
 /*---------------------------------------------------------------------------*/
 process_event_t weather_station_started_event;
 process_event_t weather_station_data_event;
 /*---------------------------------------------------------------------------*/
+weather_station_config_t ws_config;
+/*---------------------------------------------------------------------------*/
 PROCESS(weather_station_process, "Weather Station process");
 /*---------------------------------------------------------------------------*/
 static void
 rain_callback(uint16_t value)
 {
-  printf("*** Rain gauge over threshold (%u ticks)\n", value);
+  PRINTF("WS: *** Rain gauge over threshold (%u ticks)\n", value);
   weather_meter.configure(WEATHER_METER_RAIN_GAUGE_INT_OVER,
                           (value + RAIN_GAUGE_THRESHOLD_TICK));
 }
@@ -70,7 +86,7 @@ rain_callback(uint16_t value)
 static void
 wind_speed_callback(uint16_t value)
 {
-  printf("*** Wind speed over threshold (%u ticks)\n", value);
+  PRINTF("WS: *** Wind speed over threshold (%u ticks)\n", value);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -96,35 +112,35 @@ poll_sensors(void)
 
   /* Check if the I2C-based sensor values are OK */
   if(weather_sensor_values.atmospheric_pressure == BMPx8x_ERROR) {
-    printf("*** BMPx8x failed, sending zero instead\n");
+    PRINTF("WS: *** BMPx8x failed, sending zero instead\n");
     weather_sensor_values.atmospheric_pressure = 0;
   }
 
   if((weather_sensor_values.temperature == SHT25_ERROR) ||
     (weather_sensor_values.humidity == SHT25_ERROR)) {
-    printf("*** SHT25 failed, sending zero instead\n");
+    PRINTF("WS: *** SHT25 failed, sending zero instead\n");
     weather_sensor_values.temperature = 0;
     weather_sensor_values.humidity = 0;
   }
 
-  printf("Pressure = %u.%u(hPa)\n", (weather_sensor_values.atmospheric_pressure / 10),
+  PRINTF("WS: Pressure = %u.%u(hPa)\n", (weather_sensor_values.atmospheric_pressure / 10),
                                     (weather_sensor_values.atmospheric_pressure % 10));
 
-  printf("Temperature %02d.%02d ºC, ", (weather_sensor_values.temperature / 100),
+  PRINTF("WS: Temperature %02d.%02d ºC, ", (weather_sensor_values.temperature / 100),
                                        (weather_sensor_values.temperature % 100));
 
-  printf("Humidity %02d.%02d RH\n", (weather_sensor_values.humidity / 100),
+  PRINTF("Humidity %02d.%02d RH\n", (weather_sensor_values.humidity / 100),
                                     (weather_sensor_values.humidity % 100));
 
-  printf("Rain (ticks): %u, ", weather_sensor_values.rain_mm);
+  PRINTF("WS: Rain (ticks): %u, ", weather_sensor_values.rain_mm);
 
-  printf("Wind dir: %u.%01u deg, ", (weather_sensor_values.wind_dir / 10),
+  PRINTF("Wind dir: %u.%01u deg, ", (weather_sensor_values.wind_dir / 10),
                                     (weather_sensor_values.wind_dir % 10));
-  printf("(%u.%01u deg avg)\n", (weather_sensor_values.wind_dir_avg_int / 10),
+  PRINTF("(%u.%01u deg avg)\n", (weather_sensor_values.wind_dir_avg_int / 10),
                                 (weather_sensor_values.wind_dir_avg_int % 10));
 
-  printf("Wind speed: %u m/h ", weather_sensor_values.wind_speed);
-  printf("(%u m/h avg, %u m/h 2m avg, %u m/h max)\n\n", weather_sensor_values.wind_speed_avg,
+  PRINTF("WS: Wind speed: %u m/h ", weather_sensor_values.wind_speed);
+  PRINTF("(%u m/h avg, %u m/h 2m avg, %u m/h max)\n\n", weather_sensor_values.wind_speed_avg,
                                                         weather_sensor_values.wind_speed_avg_int,
                                                         weather_sensor_values.wind_speed_max);
 
@@ -132,8 +148,47 @@ poll_sensors(void)
   process_post(PROCESS_BROADCAST, weather_station_data_event, NULL);
 }
 /*---------------------------------------------------------------------------*/
+static int
+interval_post_handler(char *key, int key_len, char *val, int val_len)
+{
+  int fd;
+  int rv = 0;
+  uint8_t buf[2];
+
+  if(key_len != strlen("interval") ||
+     strncasecmp(key, "interval", strlen("interval")) != 0) {
+    return HTTPD_SIMPLE_POST_HANDLER_UNKNOWN;
+  }
+
+  rv = atoi(val);
+
+  if(rv < WEATHER_STATION_WS_INTERVAL_MIN ||
+     rv > WEATHER_STATION_WS_INTERVAL_MAX) {
+    return HTTPD_SIMPLE_POST_HANDLER_ERROR;
+  }
+
+  ws_config.interval = rv * CLOCK_SECOND;
+  PRINTF("WS: new interval tick is: %u\n", rv);
+
+  fd = cfs_open("WS_int", CFS_READ | CFS_WRITE);
+  if(fd >= 0) {
+    buf[0] = ((uint8_t *)&ws_config.interval)[0];
+    buf[1] = ((uint8_t *)&ws_config.interval)[1];
+    if(cfs_write(fd, &buf, 2) > 0) {
+      PRINTF("WS: interval saved in flash\n");
+    }
+    cfs_close(fd);
+  }
+
+  return HTTPD_SIMPLE_POST_HANDLER_OK;
+}
+/*---------------------------------------------------------------------------*/
+HTTPD_SIMPLE_POST_HANDLER(interval, interval_post_handler);
+/*---------------------------------------------------------------------------*/
 PROCESS_THREAD(weather_station_process, ev, data)
 {
+  static int fd;
+  static uint8_t buf[2];
   static struct etimer et;
 
   PROCESS_BEGIN();
@@ -159,17 +214,45 @@ PROCESS_THREAD(weather_station_process, ev, data)
   /* Post the event to notify subscribers */
   process_post(PROCESS_BROADCAST, weather_station_started_event, NULL);
 
+  /* Start the webserver */
+  process_start(&httpd_simple_process, NULL);
+
+  /* Read configuration from flash */
+  ws_config.interval = WEATHER_STATION_SENSOR_PERIOD;
+  fd = cfs_open("WS_int", CFS_READ | CFS_WRITE);
+  if(fd >= 0) {
+    if(cfs_read(fd, &buf, 2) > 0) {
+      ws_config.interval = (buf[1] << 8) + buf[0];
+    }
+    cfs_close(fd);
+  }
+
+  PRINTF("WS: interval %u\n", (uint16_t)(ws_config.interval / CLOCK_SECOND));
+
+  /* The HTTPD_SIMPLE_POST_HANDLER macro should have already created the
+   * interval_handler()
+   */
+  httpd_simple_register_post_handler(&interval_handler);
+
   /* Start the periodic process */
-  etimer_set(&et, WEATHER_STATION_SENSOR_PERIOD);
+  etimer_set(&et, ws_config.interval);
 
   weather_sensor_values.counter = 0;
 
   while(1) {
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
-    poll_sensors();
+    PROCESS_YIELD();
 
-    etimer_reset(&et);
+    if(ev == httpd_simple_event_new_config) {
+      PRINTF("WS: New configuration over httpd, restarting timer\n");
+      etimer_stop(&et);
+      etimer_set(&et, ws_config.interval);
+    }
+
+    if(ev == PROCESS_EVENT_TIMER && data == &et) {
+      poll_sensors();
+      etimer_set(&et, ws_config.interval);
+    }
   }
 
   PROCESS_END();

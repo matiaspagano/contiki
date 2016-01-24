@@ -50,6 +50,9 @@
 #define ANEMOMETER_THRESHOLD_TICK          13  /**< 16 Km/h */
 #define RAIN_GAUGE_THRESHOLD_TICK          15  /**< 4.19 mm multipliers */
 /*---------------------------------------------------------------------------*/
+#define WEATHER_STATION_WS_INTERVAL_MIN    5
+#define WEATHER_STATION_WS_INTERVAL_MAX    600
+/*---------------------------------------------------------------------------*/
 typedef struct weather_station {
   uint16_t counter;
   uint16_t temperature;
@@ -65,6 +68,12 @@ typedef struct weather_station {
 } weather_station_t;
 
 extern weather_station_t weather_sensor_values;
+/*---------------------------------------------------------------------------*/
+typedef struct weather_station_config {
+  clock_time_t interval;
+} weather_station_config_t;
+
+extern weather_station_config_t ws_config;
 /*---------------------------------------------------------------------------*/
 extern process_event_t weather_station_started_event;
 extern process_event_t weather_station_data_event;
