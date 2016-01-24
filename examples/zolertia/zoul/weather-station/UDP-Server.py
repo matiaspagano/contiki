@@ -4,6 +4,8 @@
 # UDP example to forward data from a local IPv6 network
 # Antonio Lignan <antonio.lignan@gmail.com>
 #------------------------------------------------------------#
+from __future__ import division
+
 import sys
 import json
 import datetime
@@ -12,10 +14,34 @@ from socket import error
 from time import sleep
 import struct
 from ctypes import *
+import requests
 #------------------------------------------------------------#
 PORT              = 5678
 CMD_PORT          = 8765
 BUFSIZE           = 1024
+#------------------------------------------------------------#
+URL_PWS_REF       = "http://api.wunderground.com/api/xxx/conditions/q/pws:ICERDANY6.json"
+#------------------------------------------------------------#
+WITH_UBIDOTS      = 1
+
+if WITH_UBIDOTS:
+  from ubidots import ApiClient
+  UBIDOTS_API       = "xxx"
+  UBI_COUNTER       = "xxx"
+  UBI_TEMP          = "xxx"
+  UBI_HUM           = "xxx"
+  UBI_PRES          = "xxx"
+  UBI_WIND_SP       = "xxx"
+  UBI_WIND_SP_AVG   = "xxx"
+  UBI_WIND_SP_INT   = "xxx"
+  UBI_WIND_SP_MAX   = "xxx"
+  UBI_WIND_DIR      = "xxx"
+  UBI_WIND_DIR_INT  = "xxx"
+  UBI_RAIN          = "xxx"
+
+  UBI_ICERDANY6_TEMP = "xxx"
+  UBI_ICERDANY6_HUM  = "xxx"
+  UBI_ICERDANY6_PRES = "xxx"
 #------------------------------------------------------------#
 # Message structure
 #------------------------------------------------------------#
@@ -49,6 +75,7 @@ def print_recv_data(msg):
     print "{0}:{1}".format(f_name, getattr(msg, f_name))
   print
   print "***"
+  
 # -----------------------------------------------------------#
 # UDP6 server
 #------------------------------------------------------------#
@@ -69,13 +96,46 @@ def start_server():
   print 'UDP server ready: %s'% PORT
   print
 
+  # Use Ubidots for testing the deployment
+  if WITH_UBIDOTS:
+    try:
+      ubidots = ApiClient(UBIDOTS_API)
+    except Exception:
+      print "ERROR: Failed to retrieve credentials"
+      return
+
   while True:
     data, addr = s.recvfrom(BUFSIZE)
     now = datetime.datetime.now()
     print str(now)[:19] + " -> " + str(addr[0]) + ":" + str(addr[1]) + " " + str(len(data))
 
-    msg_recv = WEATHER(data)
-    print_recv_data(msg_recv)
+    ws = WEATHER(data)
+    # print_recv_data(ws)
+
+    # Read reference data from PWS nearby (ICERDANY6)
+    # pws = requests.get(URL_PWS_REF).json()
+    # pws_temp  = float(pws['current_observation']['temp_c'])
+    # pws_hum   = float(pws['current_observation']['relative_humidity'][:-1])
+    # pws_pres  = float(pws['current_observation']['pressure_mb'])
+
+    if WITH_UBIDOTS:
+      ubidots.save_collection([
+         { "variable" : UBI_COUNTER, "value" : ws.counter },
+         { "variable" : UBI_TEMP, "value" : ws.temperature / 100 },
+         { "variable" : UBI_HUM, "value" : ws.humidity / 100 },
+         { "variable" : UBI_PRES, "value" : ws.atmospheric_pressure / 10 },
+         { "variable" : UBI_RAIN, "value" : ws.rain_mm * 0.2794 },
+         { "variable" : UBI_WIND_DIR, "value" : ws.wind_dir / 10 },
+         { "variable" : UBI_WIND_DIR_INT, "value" : ws.wind_dir_avg_int / 10 },
+         { "variable" : UBI_WIND_SP, "value" : ws.wind_speed },
+         { "variable" : UBI_WIND_SP_AVG, "value" : ws.wind_speed_avg },
+         { "variable" : UBI_WIND_SP_INT, "value" : ws.wind_speed_avg_int },
+         { "variable" : UBI_WIND_SP_MAX, "value" : ws.wind_speed_max },
+         # Reference values using a PWS accross the street
+         # { "variable" : UBI_ICERDANY6_TEMP, "value" : pws_temp },
+         # { "variable" : UBI_ICERDANY6_HUM, "value" : pws_hum },
+         # { "variable" : UBI_ICERDANY6_PRES, "value" : pws_pres },
+       ])
 
 #------------------------------------------------------------#
 # MAIN APP
