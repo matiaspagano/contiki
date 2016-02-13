@@ -104,11 +104,15 @@ poll_sensors(void)
   weather_sensor_values.wind_speed_max = weather_meter.value(WEATHER_METER_ANEMOMETER_MAX);
 
   /* Poll the atmospheric pressure sensor */
+  SENSORS_ACTIVATE(bmpx8x);
   weather_sensor_values.atmospheric_pressure = bmpx8x.value(BMPx8x_READ_PRESSURE);
+  SENSORS_DEACTIVATE(bmpx8x);
 
   /* Poll the temperature and humidity sensor */
+  SENSORS_ACTIVATE(sht25);
   weather_sensor_values.temperature = sht25.value(SHT25_VAL_TEMP);
   weather_sensor_values.humidity = sht25.value(SHT25_VAL_HUM);
+  SENSORS_DEACTIVATE(sht25);
 
   /* Check if the I2C-based sensor values are OK */
   if(weather_sensor_values.atmospheric_pressure == BMPx8x_ERROR) {
@@ -202,8 +206,6 @@ PROCESS_THREAD(weather_station_process, ev, data)
 
   /* Activate the sensors */
   SENSORS_ACTIVATE(weather_meter);
-  SENSORS_ACTIVATE(bmpx8x);
-  SENSORS_ACTIVATE(sht25);
 
   /* Configure interruption and events */
   weather_meter.configure(WEATHER_METER_ANEMOMETER_INT_OVER,
