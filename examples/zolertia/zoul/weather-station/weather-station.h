@@ -46,7 +46,7 @@
 #define UDP_SERVER_PORT  5678
 #define UDP_REGISTER_ID  190
 /*---------------------------------------------------------------------------*/
-#define WEATHER_STATION_SENSOR_PERIOD      (CLOCK_SECOND * 15)
+#define WEATHER_STATION_SENSOR_PERIOD      (CLOCK_SECOND * 300)
 #define ANEMOMETER_THRESHOLD_TICK          13  /**< 16 Km/h */
 #define RAIN_GAUGE_THRESHOLD_TICK          15  /**< 4.19 mm multipliers */
 /*---------------------------------------------------------------------------*/
