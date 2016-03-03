@@ -29,10 +29,6 @@
  * This file is part of the Contiki operating system.
  *
  */
-
-#define IEEE802154_CONF_PANID       0xCACA
-
-
 /*---------------------------------------------------------------------------*/
 #include "contiki.h"
 #include "lib/random.h"
@@ -49,14 +45,16 @@
 #include "dev/battery-sensor.h"
 #include "dev/i2cmaster.h"
 #include "dev/tmp102.h"
-#include "dev/button-sensor.h"
+
+#define CC2420_CONF_CHANNEL              25
+
 /*---------------------------------------------------------------------------*/
 /* Enables printing debug output from the IP/IPv6 libraries */
 #define DEBUG DEBUG_PRINT
 #include "net/ip/uip-debug.h"
 /*---------------------------------------------------------------------------*/
-#define SEND_INTERVAL		(300 * CLOCK_SECOND)
-#define SEND_TIME		(random_rand() % (SEND_INTERVAL))
+#define SEND_INTERVAL		(15 * CLOCK_SECOND)
+#define SEND_TIME		    (random_rand() % (SEND_INTERVAL))
 /*---------------------------------------------------------------------------*/
 /* The structure used in the Simple UDP library to create an UDP connection */
 static struct uip_udp_conn *client_conn;
@@ -190,7 +188,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
   printf("UDP client process started\n");
 
   /* Set the server address here */ 
-  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
+  uip_ip6addr(&server_ipaddr, 0x2800, 0x340, 0x52, 0x66,0x88b7, 0x5c36, 0xf82d, 0xea6e);
 
   printf("Server address: ");
   PRINT6ADDR(&server_ipaddr);
@@ -203,7 +201,6 @@ PROCESS_THREAD(udp_client_process, ev, data)
   SENSORS_ACTIVATE(adxl345);
   SENSORS_ACTIVATE(tmp102);
   SENSORS_ACTIVATE(battery_sensor);
-  SENSORS_ACTIVATE(button_sensor);
 
   /* Create a new connection with remote host.  When a connection is created
    * with udp_new(), it gets a local port number assigned automatically.
@@ -236,11 +233,10 @@ PROCESS_THREAD(udp_client_process, ev, data)
       tcpip_handler();
     }
 
-    /* Send data to the server */
-    if((ev == sensors_event && data == &button_sensor) ||
-      (etimer_expired(&periodic))) {
-      ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
+    /* Send data to the server */    
+    if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);
+      ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
     }
   }
 

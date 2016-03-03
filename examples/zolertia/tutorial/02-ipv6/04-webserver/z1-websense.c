@@ -38,6 +38,10 @@
  *         Enric M. Calvo  <ecalvo@zolertia.com>
  */
 /*---------------------------------------------------------------------------*/
+
+#define IEEE802154_CONF_PANID       0xCACA
+
+
 #include "contiki.h"
 #include "httpd-simple.h"
 #include "webserver-nogui.h"

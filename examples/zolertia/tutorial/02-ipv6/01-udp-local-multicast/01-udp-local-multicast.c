@@ -31,7 +31,10 @@
  *
  */
 /*---------------------------------------------------------------------------*/
-#include "contiki.h"
+
+#define IEEE802154_CONF_PANID       0xCACA
+
+include "contiki.h"
 
 /* The following libraries add IP/IPv6 support */
 #include "net/ip/uip.h"

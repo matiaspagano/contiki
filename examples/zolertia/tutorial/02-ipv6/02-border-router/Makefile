@@ -16,7 +16,7 @@ CFLAGS += -DWEBSERVER=1
 PROJECT_SOURCEFILES += httpd-simple.c
 
 ifeq ($(PREFIX),)
- PREFIX = aaaa::1/64
+ PREFIX = 2001:DB8::1/64
 endif
 
 CONTIKI_WITH_IPV6 = 1

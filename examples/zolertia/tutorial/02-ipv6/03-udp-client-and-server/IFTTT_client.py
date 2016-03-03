@@ -22,8 +22,9 @@ CMD_PORT          = 8765
 BUFSIZE           = 1024
 #------------------------------------------------------------#
 IFTTT_URL         = "https://maker.ifttt.com/trigger/"
-IFTTT_EVENT       = ""
-IFTTT_KEY         = ""
+IFTTT_EVENT1       = "curtain_up"
+IFTTT_EVENT2       = "curtain_down"
+IFTTT_KEY         = "b2Fytm1K8HXlxju7Dn7LZOLxQ1NW0e2NmWeHKEf1fh2"
 #------------------------------------------------------------#
 # Message structure
 #------------------------------------------------------------#
@@ -32,11 +33,7 @@ class SENSOR(Structure):
     _fields_ = [
                  ("id",                         c_uint8),
                  ("counter",                    c_uint16),
-                 ("temperature",                c_int16),
-                 ("x_axis",                     c_int16),
-                 ("y_axis",                     c_int16),
-                 ("z_axis",                     c_int16),
-                 ("battery",                    c_uint16)
+                 ("light",	                c_int16),
                ]
 
     def __new__(self, socket_buffer):
@@ -83,11 +80,18 @@ def start_client():
 
     # Create an empty dictionary and store the values to send
     report = {}
-    report["value1"] = msg_recv.counter
-    report["value2"] = msg_recv.temperature
-    report["value3"] = msg_recv.battery
-    requests.post(IFTTT_URL + IFTTT_EVENT + "/with/key/" + IFTTT_KEY, data=report) 
+    report["value1"] = msg_recv.light
+    report["value2"] = msg_recv.counter
 
+    # Chequeamos que evento se produce, dependiendo de los lumenes detectados    
+    event = ''
+    if (msg_recv.light > 1000):
+      event = IFTTT_EVENT1
+    elif(msg_recv.light < 50):
+      event = IFTTT_EVENT2
+    if (event != ''):
+      print "Evento disparado!! "+event+"\n"
+      requests.post(IFTTT_URL + event + "/with/key/" + IFTTT_KEY, data=report) 
 #------------------------------------------------------------#
 # MAIN APP
 #------------------------------------------------------------#

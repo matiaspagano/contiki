@@ -29,11 +29,10 @@
  * This file is part of the Contiki operating system.
  *
  */
-
+/*---------------------------------------------------------------------------*/
 #define IEEE802154_CONF_PANID       0xCACA
 
 
-/*---------------------------------------------------------------------------*/
 #include "contiki.h"
 #include "lib/random.h"
 #include "sys/ctimer.h"
@@ -45,18 +44,21 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "dev/adxl345.h"
-#include "dev/battery-sensor.h"
+/* SOLO CARGO LOS DE LUZ */
+
 #include "dev/i2cmaster.h"
-#include "dev/tmp102.h"
-#include "dev/button-sensor.h"
+#include "dev/light-ziglet.h"
+#define SENSOR_READ_INTERVAL (CLOCK_SECOND / 2)
+static struct etimer et;
+
+
 /*---------------------------------------------------------------------------*/
 /* Enables printing debug output from the IP/IPv6 libraries */
 #define DEBUG DEBUG_PRINT
 #include "net/ip/uip-debug.h"
 /*---------------------------------------------------------------------------*/
-#define SEND_INTERVAL		(300 * CLOCK_SECOND)
-#define SEND_TIME		(random_rand() % (SEND_INTERVAL))
+#define SEND_INTERVAL		(15 * CLOCK_SECOND)
+#define SEND_TIME		    (random_rand() % (SEND_INTERVAL))
 /*---------------------------------------------------------------------------*/
 /* The structure used in the Simple UDP library to create an UDP connection */
 static struct uip_udp_conn *client_conn;
@@ -93,26 +95,18 @@ tcpip_handler(void)
 static void
 send_packet(void *ptr)
 {
-  uint32_t aux;
   counter++;
 
-  msg.id      = 0xAB;
-  msg.counter = counter;
-  msg.value1  = tmp102.value(TMP102_READ);
-  msg.value2  = adxl345.value(X_AXIS);
-  msg.value3  = adxl345.value(Y_AXIS);
-  msg.value4  = adxl345.value(Z_AXIS);
+	  msg.id      = 0xAB;
+	  msg.counter = counter;
+	  msg.value1  = light_ziglet_read();
+	  msg.value2  = 0;
+	  msg.value3  = 0;
+	  msg.value4  = 0;
+	  msg.battery = 0;
 
-  /* Convert the battery reading from ADC units to mV (powered over USB) */
-  aux = battery_sensor.value(0);
-  aux *= 5000;
-  aux /= 4095;
-  msg.battery = aux;
-
-  /* Print the sensor data */
-  printf("ID: %u, temp: %u, x: %d, y: %d, z: %d, batt: %u, counter: %u\n",
-          msg.id, msg.value1, msg.value2, msg.value3, msg.value4,
-          msg.battery, msg.counter);
+	  /* Print the sensor data */
+	  printf("ID: %u, Light: %u\n", msg.id, msg.value1);
 
   /* Convert to network byte order as expected by the UDPServer application */
   msg.counter = UIP_HTONS(msg.counter);
@@ -122,8 +116,7 @@ send_packet(void *ptr)
   msg.value4  = UIP_HTONS(msg.value4);
   msg.battery = UIP_HTONS(msg.battery);
 
-  PRINTF("Send readings to %u'\n",
-                                server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
+  PRINTF("Send readings to %u \n", server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1]);
 
   uip_udp_packet_sendto(client_conn, msgPtr, sizeof(msg),
                         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
@@ -167,7 +160,7 @@ set_global_address(void)
  * Note the IPCMV6 checksum verification depends on the correct uncompressed addresses.
  */
 
-  uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
+  uip_ip6addr(&ipaddr, 0x2001, 0xdb8, 0, 0, 0, 0, 0, 0);
   uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
   uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 }
@@ -190,8 +183,8 @@ PROCESS_THREAD(udp_client_process, ev, data)
   printf("UDP client process started\n");
 
   /* Set the server address here */ 
-  uip_ip6addr(&server_ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 1);
-
+  uip_ip6addr(&server_ipaddr, 0x2800, 0x340, 0x52, 0x66,0x20c, 0x29ff, 0xfe67, 0xd86b);
+	//2800:340:52:66:20c:29ff:fe67:d86b/64
   printf("Server address: ");
   PRINT6ADDR(&server_ipaddr);
   printf("\n");
@@ -200,11 +193,11 @@ PROCESS_THREAD(udp_client_process, ev, data)
   print_local_addresses();
 
   /* Activate the sensors */
-  SENSORS_ACTIVATE(adxl345);
-  SENSORS_ACTIVATE(tmp102);
-  SENSORS_ACTIVATE(battery_sensor);
-  SENSORS_ACTIVATE(button_sensor);
-
+  
+   /* Initialize driver and set a slower data rate */
+  light_ziglet_init();
+  i2c_setrate(I2C_PRESC_100KHZ_LSB, I2C_PRESC_100KHZ_MSB);
+	
   /* Create a new connection with remote host.  When a connection is created
    * with udp_new(), it gets a local port number assigned automatically.
    * The "UIP_HTONS()" macro converts to network byte order.
@@ -236,15 +229,20 @@ PROCESS_THREAD(udp_client_process, ev, data)
       tcpip_handler();
     }
 
-    /* Send data to the server */
-    if((ev == sensors_event && data == &button_sensor) ||
-      (etimer_expired(&periodic))) {
-      ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
+    /* Send data to the server */    
+    if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);
-    }
+     /* ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL); */
+      
+      etimer_set(&et, SENSOR_READ_INTERVAL);
+	  PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+
+		if (light_ziglet_read() > 1500){
+			ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
+		}
+	}
   }
 
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
-

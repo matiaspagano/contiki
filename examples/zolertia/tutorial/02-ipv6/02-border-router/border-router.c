@@ -35,6 +35,9 @@
  *         Nicolas Tsiftes <nvt@sics.se>
  */
 
+#define IEEE802154_CONF_PANID       0xCACA
+
+
 #include "contiki.h"
 #include "contiki-lib.h"
 #include "contiki-net.h"
@@ -104,7 +107,7 @@ PROCESS_THREAD(webserver_nogui_process, ev, data)
 }
 AUTOSTART_PROCESSES(&border_router_process,&webserver_nogui_process);
 
-static const char *TOP = "<html><head><title>ContikiRPL</title></head><body>\n";
+static const char *TOP = "<html><head><title>ConMIKEL</title></head><body>\n";
 static const char *BOTTOM = "</body></html>\n";
 #if BUF_USES_STACK
 static char *bufptr, *bufend;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Institute for Pervasive Computing, ETH Zurich
+ * Copyright (c) 2010, Loughborough University - Computer Science
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,53 +28,40 @@
  *
  * This file is part of the Contiki operating system.
  */
-/*---------------------------------------------------------------------------*/
+
 /**
  * \file
- *      Erbium (Er) example project configuration.
+ *         Project specific configuration defines for the sniffer example.
+ *
  * \author
- *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
+ *         George Oikonomou - <oikonomou@users.sourceforge.net>
  */
-/*---------------------------------------------------------------------------*/
-#ifndef __PROJECT_ERBIUM_CONF_H__
-#define __PROJECT_ERBIUM_CONF_H__
 
-/* This should match the Border Router configuration */
-#undef UIP_CONF_BUFFER_SIZE
-#define UIP_CONF_BUFFER_SIZE           256
+#ifndef PROJECT_CONF_H_
+#define PROJECT_CONF_H_
 
-/* Override this due to RAM overflow */
-#undef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS   5
-#undef UIP_CONF_MAX_ROUTES
-#define UIP_CONF_MAX_ROUTES            5
+#undef RF_CHANNEL
+#define RF_CHANNEL	25
 
-/* Disabling RDC for demo purposes */
+#undef CC2420_CONF_CHANNEL
+#define CC2420_CONF_CHANNEL 25
+
 #undef NETSTACK_CONF_RDC
-#define NETSTACK_CONF_RDC              nullrdc_driver
+#define NETSTACK_CONF_RDC      nullrdc_driver
+#undef NETSTACK_CONF_MAC
+#define NETSTACK_CONF_MAC      nullmac_driver
 
-/* Disabling TCP on CoAP nodes. */
-#undef UIP_CONF_TCP
-#define UIP_CONF_TCP                   0
+#undef CC2420_CONF_AUTOACK
+#define CC2420_CONF_AUTOACK 0
+#undef CC2420_CONF_HEXDUMP
+#define CC2420_CONF_HEXDUMP 1
+//#define CC2420_CONF_CHECKSUM 1
 
-/* Increase rpl-border-router IP-buffer when using more than 64. */
-#undef REST_MAX_CHUNK_SIZE
-#define REST_MAX_CHUNK_SIZE            48
+#undef ADC_SENSOR_CONF_ON
+#define ADC_SENSOR_CONF_ON     0
+#undef LPM_CONF_MODE
+#define LPM_CONF_MODE          0
+#undef UART0_CONF_HIGH_SPEED
+#define UART0_CONF_HIGH_SPEED  1
 
-/* Multiplies with chunk size, be aware of memory constraints. */
-#undef COAP_MAX_OPEN_TRANSACTIONS
-#define COAP_MAX_OPEN_TRANSACTIONS     4
-
-#undef COAP_MAX_OBSERVERS
-#define COAP_MAX_OBSERVERS             3
-
-/* Filtering .well-known/core per query can be disabled to save space. */
-#undef COAP_LINK_FORMAT_FILTERING
-#define COAP_LINK_FORMAT_FILTERING     0
-#undef COAP_PROXY_OPTION_PROCESSING
-#define COAP_PROXY_OPTION_PROCESSING   0
-
-/* Enable client-side support for COAP observe */
-#define COAP_OBSERVE_CLIENT 1
-
-#endif
+#endif /* PROJECT_CONF_H_ */
